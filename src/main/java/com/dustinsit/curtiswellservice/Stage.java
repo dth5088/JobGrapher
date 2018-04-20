@@ -5,19 +5,15 @@
  */
 package com.dustinsit.curtiswellservice;
 
-import static com.itextpdf.kernel.pdf.PdfName.Annotation;
-import java.awt.Component;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import javax.swing.DefaultComboBoxModel;
-import javax.swing.JComboBox;
 import org.jfree.chart.JFreeChart;
-import org.jfree.chart.annotations.Annotation;
+import org.jfree.chart.annotations.XYAnnotation;
+import org.jfree.chart.annotations.XYPointerAnnotation;
 import org.jfree.chart.annotations.XYTextAnnotation;
-import org.jfree.chart.plot.XYPlot;
 
 
 /**
@@ -29,7 +25,6 @@ public class Stage {
     private Date startTime;
     private Date endTime;
     private ArrayList<Recording> stageData;
-    private HashMap<Date, Recording> mappedData;
     private final String pattern = "yyyy-MM-dd HH:mm:ss";
     private final SimpleDateFormat format = new SimpleDateFormat(pattern);
     private double maxPressure = 0;
@@ -40,36 +35,57 @@ public class Stage {
     private double minSandRate = 0;
     private JFreeChart chart;
     private Chart ch;
-    private ArrayList<XYTextAnnotation> annotations;
+    private ArrayList<XYAnnotation> annotations;
+    private String subStage = "";
     
     
     public Stage(int stageNum) {
         this.stageNum = stageNum;
         this.stageData = new ArrayList<>();
-        mappedData = new HashMap<>();
         annotations = new ArrayList<>();
+    }
+    
+    public Stage(int stageNum, String subStage, ArrayList<Recording> stageData) {
+        this.stageNum = stageNum;
+        this.stageData = new ArrayList<>(stageData);
+        annotations = new ArrayList<>();
+        this.subStage += subStage;
+        
+        
     }
     
     public boolean hasAnnotations() {
         return !annotations.isEmpty();
     }
     
-    public ArrayList<XYTextAnnotation> getAnnotations() {
+    public String getSubStage() {
+        return subStage;
+    }
+    public ArrayList<XYAnnotation> getAnnotations() {
         return annotations;
     }
-    public boolean deleteAnnotation(XYTextAnnotation annotation) {
+    public boolean deleteAnnotation(XYAnnotation annotation) {
         boolean bool = false;
-        if(annotations.contains(annotation))
+        synchronized(this)
         {
-            annotations.remove(annotation);
-            ch.removeAnnotation(annotation);
-            bool = true;
+            if(annotations.contains(annotation))
+            {
+                annotations.remove(annotation);
+                ch.removeAnnotation(annotation);
+                ch = new Chart("Stage " + stageNum, this);
+                bool = true;
+            }
         }
+     
         return bool;
     }
     
     public JFreeChart getChart() {
-        ch = new Chart("Stage " + stageNum, this);
+        if(subStage.length() > 0)
+            ch = new Chart("Stage " + subStage, this);
+        else
+            ch = new Chart("Stage " + stageNum, this);
+        
         return ch.getChart();
     }
     
@@ -91,46 +107,34 @@ public class Stage {
         return temp;
     }
     
-    public boolean deleteRecordingsAndAddGapsBetween(Date start, Date end) {
+    public boolean deleteAllRecordingsBefore(Date date) {
         boolean temp = false;
-//        for(Recording recording : stageData)
-//        {
-//            if(recording.getTime().after(start) && recording.getTime().before(end))
-//            {
-//                recording.clearValues();
-//                //stageData.remove(recording);
-//                temp = true;
-//            }
-//        }
-        
-        Recording starting = null;
-        Recording ending = null;
-        if(mappedData.containsKey(start))
-        {
-            starting = mappedData.get(start);
-            System.out.println("has " + start);
-        }
-        if(mappedData.containsKey(end))
-        {
-            ending = mappedData.get(end);
-            System.out.println("has " + end);
-        }
-        
-        if(starting != null && ending != null)
-        {
-            temp = true;
-            int startingIndex = stageData.indexOf(starting);
-            int endingIndex = stageData.indexOf(ending);
-            
-            for(int i = startingIndex; i <= endingIndex; i++)
+        ArrayList<Recording> tempRecs = new ArrayList<>(stageData);
+        for(Recording record : tempRecs) {
+            Date current = record.getTime();
+            if(current.before(date))
             {
-                stageData.get(i).clearValues();
+                stageData.remove(record);
+                temp = true;
             }
         }
-        
-        
         return temp;
     }
+    
+    public boolean deleteAllRecordingsAfter(Date date) {
+        boolean temp = false;
+        ArrayList<Recording> tempRecs = new ArrayList<>(stageData);
+        for(Recording record : tempRecs) {
+            Date current = record.getTime();
+            if(current.after(date))
+            {
+                stageData.remove(record);
+                temp = true;
+            }
+        }
+        return temp;
+    }
+        
     public void addRecording(String pressure, String waterRate, String time, String sandRate) {
         try {
             Date parsedTime = format.parse(time);
@@ -139,7 +143,6 @@ public class Stage {
             Double sandDouble = Double.parseDouble(sandRate);
             Recording recording = new Recording(pressureDouble,waterDouble,parsedTime,sandDouble);
             stageData.add(recording);
-            mappedData.put(recording.getTime(), recording);
             if(pressureDouble > maxPressure)
                 maxPressure = pressureDouble;
             else if (pressureDouble < minPressure)
@@ -166,7 +169,7 @@ public class Stage {
         }
     }
     
-    public void addAnnotationToChart(XYTextAnnotation annotation) {
+    public void addAnnotationToChart(XYAnnotation annotation) {
        if(ch != null)
            ch.addAnnotation(annotation);
        annotations.add(annotation);
@@ -206,6 +209,26 @@ public class Stage {
         return this.stageNum;
     }
     
+    
+    public ArrayList<Recording> getRecordingsBetween(Date start, Date end) {
+        ArrayList<Recording> temp = new ArrayList<>();
+        for(Recording record : stageData)
+        {
+            Date current = record.getTime();
+            if(current.after(start) && current.before(end))
+            {
+                temp.add(record);
+                    
+            }
+        }
+        removeRecordings(temp);
+        return temp;
+    }
+    
+    private boolean removeRecordings(ArrayList<Recording> records) {
+        return stageData.removeAll(records);
+        
+    }
     
     public String toString() {
         String str = "";

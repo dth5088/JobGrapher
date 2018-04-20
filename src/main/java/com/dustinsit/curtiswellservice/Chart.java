@@ -12,10 +12,11 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
-import org.jfree.chart.annotations.Annotation;
+import org.jfree.chart.annotations.XYAnnotation;
 import org.jfree.chart.annotations.XYTextAnnotation;
 import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.labels.StandardXYToolTipGenerator;
 import static org.jfree.chart.labels.StandardXYToolTipGenerator.DEFAULT_TOOL_TIP_FORMAT;
 import org.jfree.chart.plot.XYPlot;
@@ -61,12 +62,12 @@ public class Chart {
         plot.setRangeGridlinePaint(Color.GRAY);
         axis2 = new NumberAxis("Water Rate (BBL/MIN)");
         axis2.setAutoRangeIncludesZero(false);
+        axis2.setRange(0.0, 50.0);
         plot.setRangeAxis(1, axis2);
         plot.setDataset(1, dataset2);
         plot.mapDatasetToRangeAxis(1, 1);
         renderer = plot.getRenderer();
-        renderer.setSeriesPaint(0, new Color(34, 58, 94));
-        
+        renderer.setSeriesPaint(0,Color.BLACK);
         
         
         
@@ -89,20 +90,23 @@ public class Chart {
         }
 
         
-        renderer2.setSeriesPaint(0, Color.BLACK);
+        renderer2.setSeriesPaint(0, Color.BLUE);
         renderer2.setPlotLines(true);
         
         plot.setRenderer(1, renderer2);
         plot.setDomainCrosshairVisible(true);
-        plot.setDomainCrosshairLockedOnData(false);
+        plot.setDomainCrosshairLockedOnData(true);
         plot.setRangeCrosshairVisible(true);
+        plot.getRangeAxis().setRange(0.0,5000.00);
         plot.setRangeCrosshairLockedOnData(false);
         axis = (DateAxis) plot.getDomainAxis();
         axis.setDateFormatOverride(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")); 
-        
+        axis.setAutoTickUnitSelection(true);
+        axis.setAutoRange(true);
+         
         if(stage.hasAnnotations())
         {
-            for(XYTextAnnotation annotation : stage.getAnnotations())
+            for(XYAnnotation annotation : stage.getAnnotations())
             {
                 plot.addAnnotation(annotation);
             }
@@ -113,7 +117,7 @@ public class Chart {
         return chart;
     }
     
-    public void addAnnotation(XYTextAnnotation annotation) {
+    public void addAnnotation(XYAnnotation annotation) {
         plot.addAnnotation(annotation);
     }
     
@@ -141,7 +145,7 @@ public class Chart {
         dataset2 = datasetb;
     }
 
-    void removeAnnotation(XYTextAnnotation annotation) {
+    synchronized void removeAnnotation(XYAnnotation annotation) {
         plot.removeAnnotation(annotation);
     }
     
