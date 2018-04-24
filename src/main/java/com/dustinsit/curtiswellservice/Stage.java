@@ -7,7 +7,14 @@ package com.dustinsit.curtiswellservice;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import static java.time.temporal.ChronoUnit.MINUTES;
+import static java.time.temporal.ChronoUnit.SECONDS;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import org.jfree.chart.JFreeChart;
@@ -199,6 +206,33 @@ public class Stage {
         return minSandRate;
     }
     
+    public double getAveragePressure() {
+        double average = 0.0;
+        for(Recording record : stageData) {
+            average += record.getPressure();
+        }
+        
+        return average / stageData.size();
+    }
+    
+    public double getAverageWaterRate() {
+        double average = 0.0;
+        for(Recording record : stageData) {
+            average += record.getWaterRate();
+        }
+        
+        return average / stageData.size();
+    }
+    
+    public double getAverageSandRate() {
+        double average = 0.0;
+        for(Recording record : stageData) {
+            average += record.getSandRate();
+        }
+        
+        return average / stageData.size();
+    }
+    
     public ArrayList<Recording> getStageData() {
         return this.stageData;
     }
@@ -228,6 +262,63 @@ public class Stage {
     private boolean removeRecordings(ArrayList<Recording> records) {
         return stageData.removeAll(records);
         
+    }
+    
+    public LocalTime getStartTime() {
+        Date current = stageData.get(0).getTime();
+        LocalTime localTime = current.toInstant().atZone(ZoneId.systemDefault()).toLocalTime();
+        return localTime;
+    }
+    
+    public LocalTime getEndTime() {
+        Date current = stageData.get(stageData.size() - 1).getTime();
+        LocalTime localTime = current.toInstant().atZone(ZoneId.systemDefault()).toLocalTime();
+        return localTime;
+    }
+    
+    public Duration getDuration() {
+        long numSeconds = 0;
+        Date current = stageData.get(0).getTime();
+        for(int i = 1; i < stageData.size(); i++) {
+            Date next = stageData.get(i).getTime();
+            LocalTime cTime = current.toInstant().atZone(ZoneId.systemDefault()).toLocalTime();
+            LocalTime nTime = next.toInstant().atZone(ZoneId.systemDefault()).toLocalTime();
+            numSeconds += cTime.until(nTime, SECONDS);
+            current = next;
+        }
+        Duration d = Duration.ofSeconds(numSeconds);
+        return d;
+    }
+    
+    public double getTotalBarrels() {
+        double numBarrels = 0.0;
+        for(Recording record : stageData)
+        {
+            numBarrels += record.getWaterRate();
+        }
+        double averageRate = numBarrels / stageData.size();
+        double estimatedBarrels = averageRate * getDuration().toMinutes();
+        return estimatedBarrels;
+    }
+    public ArrayList<String>dates() {
+        ArrayList<String> returnStuff = new ArrayList<>();
+        Date current = null;
+        current = stageData.get(0).getTime();
+        LocalDate localDate = current.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        int year = localDate.getYear();
+        int month = localDate.getMonthValue();
+        int day = localDate.getDayOfMonth();
+        returnStuff.add(localDate.toString());
+        for(Recording record : stageData)
+        {
+            Date d = record.getTime();
+            LocalDate l = d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            if(l.getDayOfMonth() != day)
+            {
+                returnStuff.add(l.toString());
+            }  
+        }
+        return returnStuff;
     }
     
     public String toString() {

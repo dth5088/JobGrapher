@@ -24,6 +24,7 @@ import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.VerticalAlignment;
 import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -32,6 +33,10 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
@@ -44,6 +49,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -54,13 +61,20 @@ import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
+import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.MaskFormatter;
 import org.jfree.chart.ChartMouseEvent;
 import org.jfree.chart.ChartMouseListener;
 import org.jfree.chart.ChartPanel;
@@ -207,7 +221,10 @@ public class Parser {
         //doc.add(new Paragraph().add(jobName).add(jobWellNum).add(jobLot));
         Paragraph lot = new Paragraph().add(jobLot);
         doc.showTextAligned(lot, 300, 400, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+        getJobStats(doc);
         doc.add(new AreaBreak(AreaBreakType.NEXT_AREA));
+        
+        
         
         
         Iterator<Stage> it = job.getStages().iterator();
@@ -264,6 +281,8 @@ public class Parser {
         //doc.add(new Paragraph().add(jobName).add(jobWellNum).add(jobLot));
         Paragraph lot = new Paragraph().add(jobLot);
         doc.showTextAligned(lot, 400, 250, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+        
+        getJobStats(doc);
         doc.add(new AreaBreak(AreaBreakType.NEXT_AREA));
         
         
@@ -277,14 +296,14 @@ public class Parser {
             
             Image img = convertChartToImageLandscape(stageChart);
             //img.setAutoScaleWidth(true);
-            img.scaleToFit(770, 260);
+            img.scaleToFit(770, 520);
             img.setHorizontalAlignment(HorizontalAlignment.CENTER);
             doc.add(img);
-            if(i == 2)
-            {
-                pdfDoc.addNewPage(PageSize.A4.rotate());
-                i = 0;
-            }
+//            if(i == 2)
+//            {
+//                pdfDoc.addNewPage(PageSize.A4.rotate());
+//                i = 0;
+//            }
  
             
         }
@@ -292,7 +311,7 @@ public class Parser {
         return pdfName;
     }
       
-    private Image convertChartToImage(JFreeChart chart) throws IOException {
+    private static Image convertChartToImage(JFreeChart chart) throws IOException {
         Image result = null;
         BufferedImage original = chart.createBufferedImage(600,400);
         
@@ -306,9 +325,9 @@ public class Parser {
         return result;
     }
     
-    private Image convertChartToImageLandscape(JFreeChart chart) throws IOException {
+    private static Image convertChartToImageLandscape(JFreeChart chart) throws IOException {
         Image result = null;
-        BufferedImage original = chart.createBufferedImage(800,260);
+        BufferedImage original = chart.createBufferedImage(800,520);
         
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             ImageIO.write(original, "png", os);
@@ -358,49 +377,55 @@ public class Parser {
         
         
         chartPanel.getPopupMenu().addSeparator();
-        JMenuItem clearAllBeforeDateMenuItem = new JMenuItem("Remove All Previous");
-        chartPanel.getPopupMenu().add(clearAllBeforeDateMenuItem);
-        clearAllBeforeDateMenuItem.addActionListener((event) -> {
-            XYPlot plot = (XYPlot) chartPanel.getChart().getXYPlot();
-            ValueAxis xAxis = plot.getDomainAxis();
-            double x = 0;
-            try {
-                x = xAxis.java2DToValue(chartPanel.getMousePosition().getX(), chartPanel.getScreenDataArea(), RectangleEdge.BOTTOM);
-            } catch(Exception e) {
-                JOptionPane.showMessageDialog(null, "Incorrect Date Selected, Please Try Again!");
-            }
-            if(x != 0)
-            {
-                Date date = new Date((long)x);
-                if(job.getStage(currentStage).deleteAllRecordingsBefore(date))
-                {
-                    ChartPanel cPanel = new ChartPanel(job.getStage(currentStage).getChart());
-                    setupChartPanel(cPanel);
-                }
-            }
+        JMenuItem alterStageMenuItem = new JMenuItem("Alter Stage");
+        chartPanel.getPopupMenu().add(alterStageMenuItem);
+        alterStageMenuItem.addActionListener((event) -> {
+            JPanel panel = alterStageData();
+            JOptionPane.showMessageDialog(null, panel);
         });
         
-        JMenuItem clearAllAfterDateMenuItem = new JMenuItem("Remove All After");
-        chartPanel.getPopupMenu().add(clearAllAfterDateMenuItem);
-        clearAllAfterDateMenuItem.addActionListener((event) -> {
-             XYPlot plot = (XYPlot) chartPanel.getChart().getXYPlot();
-            ValueAxis xAxis = plot.getDomainAxis();
-            double x = 0;
-            try {
-                x = xAxis.java2DToValue(chartPanel.getMousePosition().getX(), chartPanel.getScreenDataArea(), RectangleEdge.BOTTOM);
-            } catch(Exception e) {
-                JOptionPane.showMessageDialog(null, "Incorrect Date Selected, Please Try Again!");
-            }
-            if(x != 0)
-            {
-                Date date = new Date((long)x);
-                if(job.getStage(currentStage).deleteAllRecordingsAfter(date))
-                {
-                    ChartPanel cPanel = new ChartPanel(job.getStage(currentStage).getChart());
-                    setupChartPanel(cPanel);
-                }
-            }
-        });
+//        chartPanel.getPopupMenu().add(clearAllBeforeDateMenuItem);
+//        clearAllBeforeDateMenuItem.addActionListener((event) -> {
+//            XYPlot plot = (XYPlot) chartPanel.getChart().getXYPlot();
+//            ValueAxis xAxis = plot.getDomainAxis();
+//            double x = 0;
+//            try {
+//                x = xAxis.java2DToValue(chartPanel.getMousePosition().getX(), chartPanel.getScreenDataArea(), RectangleEdge.BOTTOM);
+//            } catch(Exception e) {
+//                JOptionPane.showMessageDialog(null, "Incorrect Date Selected, Please Try Again!");
+//            }
+//            if(x != 0)
+//            {
+//                Date date = new Date((long)x);
+//                if(job.getStage(currentStage).deleteAllRecordingsBefore(date))
+//                {
+//                    ChartPanel cPanel = new ChartPanel(job.getStage(currentStage).getChart());
+//                    setupChartPanel(cPanel);
+//                }
+//            }
+//        });
+//        
+//        JMenuItem clearAllAfterDateMenuItem = new JMenuItem("Remove All After");
+//        chartPanel.getPopupMenu().add(clearAllAfterDateMenuItem);
+//        clearAllAfterDateMenuItem.addActionListener((event) -> {
+//             XYPlot plot = (XYPlot) chartPanel.getChart().getXYPlot();
+//            ValueAxis xAxis = plot.getDomainAxis();
+//            double x = 0;
+//            try {
+//                x = xAxis.java2DToValue(chartPanel.getMousePosition().getX(), chartPanel.getScreenDataArea(), RectangleEdge.BOTTOM);
+//            } catch(Exception e) {
+//                JOptionPane.showMessageDialog(null, "Incorrect Date Selected, Please Try Again!");
+//            }
+//            if(x != 0)
+//            {
+//                Date date = new Date((long)x);
+//                if(job.getStage(currentStage).deleteAllRecordingsAfter(date))
+//                {
+//                    ChartPanel cPanel = new ChartPanel(job.getStage(currentStage).getChart());
+//                    setupChartPanel(cPanel);
+//                }
+//            }
+//        });
         
         
     }
@@ -549,23 +574,138 @@ public class Parser {
             }
         });
         
+        
         JPanel returnPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         
         JPanel buttonPanel = setupStageButtons();
         setupChartPanel();
         gbc.gridx = 0;
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         returnPanel.add(buttonPanel);
         
         gbc.gridwidth = GridBagConstraints.REMAINDER;
         gbc.gridx = 1;
         returnPanel.add(stageChartPanel);
+        
+        
         return returnPanel;
+        
+    }
+    
+    private void getJobStats(Document document) {
+        Paragraph paragraph;
+        float x =  400;
+        float y = 100;
+        double minP = 0.0, maxP = 0.0, minW = 0.0, maxW = 0.0, minS = 0.0, maxS = 0.0, aP = 0.0, aW = 0.0, aS = 0.0;
+        paragraph = new Paragraph().add(job.getTotalDuration());
+        document.showTextAligned(paragraph, x, y+60, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+        for(HashMap.Entry<String,Double> entry : job.getOutliers().entrySet())
+        {
+            paragraph = new Paragraph();
+            String key = entry.getKey();
+            double val = entry.getValue();
+            switch(entry.getKey())
+            {
+                case "maxPressure":
+                    maxP = entry.getValue();
+                    paragraph.add(String.format("%s %.2f","Max Pressure: ", maxP));
+                    document.showTextAligned(paragraph,x,y+45, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+                    break;
+                case "maxWaterRate":
+                    maxW = entry.getValue();
+                    paragraph.add(String.format("%s %.2f","Max Water Rate:",maxW));
+                    document.showTextAligned(paragraph,x,y+30, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+                    break;
+//                case "maxSandRate":
+//                    maxS = entry.getValue();
+//                    paragraph.add(String.format("%s %.2f","Max Sand Rate: ", maxS));
+//                    document.showTextAligned(paragraph,x,y, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+//                    break;
+                case "averagePressure":
+                    aP = entry.getValue();
+                    paragraph.add(String.format("%s %.2f","Average Pressure: ",aP));
+                    document.showTextAligned(paragraph,x,y+15, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+                    break;
+                case "averageWaterRate":
+                    aW = entry.getValue();
+                    paragraph.add(String.format("%s%.2f", "Average Water Rate: ", aW));
+                    document.showTextAligned(paragraph,x,y, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+                    break;
+//                case "averageSandRate":
+//                    aS = entry.getValue();
+//                    paragraph.add(String.format("%s %.2f","Average Sand Rate: ",aS));
+//                    document.showTextAligned(paragraph,x,y, TextAlignment.CENTER, VerticalAlignment.MIDDLE);
+//                    break;
+                
+            }
+        }
+      
+    }
+    
+    private String getJobStatsString() {
+        String str = "";
+        double minP = 0.0, maxP = 0.0, minW = 0.0, maxW = 0.0, minS = 0.0, maxS = 0.0, aP = 0.0, aW = 0.0, aS = 0.0;
+        for(HashMap.Entry<String,Double> entry : job.getOutliers().entrySet())
+        {
+            switch(entry.getKey())
+            {
+                case "minPressure":
+                    minP = entry.getValue();
+                    break;
+                case "maxPressure":
+                    maxP = entry.getValue();
+                    break;
+                case "minWaterRate":
+                    minW = entry.getValue();
+                    break;
+                case "maxWaterRate":
+                    maxW = entry.getValue();
+                    break;
+                case "minSandRate":
+                    minS = entry.getValue();
+                    break;
+                case "maxSandRate":
+                    maxS = entry.getValue();
+                    break;
+                case "averagePressure":
+                    aP = entry.getValue();
+                    break;
+                case "averageWaterRate":
+                    aW = entry.getValue();
+                    break;
+                case "averageSandRate":
+                    aS = entry.getValue();
+                    break;
+                
+            }
+        }
+        
+        //str+= String.format("%s: %.2f %n", "Min Pressure",minP);
+        str+= String.format("%s: %.2f %n", "Max Pressure",maxP);
+        //str+= String.format("%s: %.2f %n", "Min Water Rate",minW);
+        str+= String.format("%s: %.2f %n", "Max Water Rate",maxW);
+        //str+= String.format("%s: %.2f %n", "Min Sand Rate",minS);
+        str+= String.format("%s: %.2f %n", "Max Sand Rate",maxS);
+        str+= String.format("%s: %.2f %n", "Average Pressure",aP);
+        str+= String.format("%s: %.2f %n", "Average Water Rate",aW);
+        str+= String.format("%s: %.2f %n", "Average Sand Rate", aS);
+        return str;
     }
     
     private JPanel setupStageButtons() {
+        JPanel returnPanel = new JPanel();
+        JTextArea textArea = new JTextArea();
+        textArea.append(job.getTotalDuration()+"\n");
+        textArea.append(String.format("%s: %.2f%n", "Total Barrels",job.getTotalBarrels()));
+        textArea.append(getJobStatsString());
+        textArea.setEditable(false);
+        JSplitPane sp = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        sp.setResizeWeight(0.7);
+        sp.setDividerSize(0);
+        
         stageButtonsPanel = new JPanel(new GridLayout(0,2,2,2));
+        
         for(Stage stage : job.getStages())
         {
             JButton button = job.getStageButton(stage);
@@ -574,7 +714,10 @@ public class Parser {
             
         }
         
-        return stageButtonsPanel;
+        sp.add(textArea);
+        sp.add(stageButtonsPanel);
+        returnPanel.add(sp, BorderLayout.CENTER);
+        return returnPanel;
     }
     
     private void setupButtonEvent(JButton button) {
@@ -786,5 +929,191 @@ public class Parser {
         }
         return newStage;
     }
+    
+    private JPanel alterStageData() {
+        JPanel panel = new JPanel();
+        JButton deleteAfterButton = new JButton("Delete After"), deleteBeforeButton = new JButton("Delete Before");
+        JButton deleteBetweenButton = new JButton("Delete Between");
+        
+        
+        panel.add(deleteAfterButton);
+        panel.add(deleteBeforeButton);
+        panel.add(deleteBetweenButton);
+        
+        JComboBox<String> dateSelector = new JComboBox<>();
+        job.getDates().forEach((eachDate) -> {
+            
+            dateSelector.addItem(eachDate);
+         });
+        
+        
+        
+        
+        deleteAfterButton.addActionListener((event) -> {
+           JPanel p = afterPanel(dateSelector);
+           JOptionPane.showMessageDialog(panel, p, "Delete After Selection", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
+        deleteBeforeButton.addActionListener((event) -> {
+            JPanel p = beforePanel(dateSelector);
+            JOptionPane.showMessageDialog(panel, p, "Delete Before Selection", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
+        deleteBetweenButton.addActionListener((event) -> {
+            JPanel p = betweenPanel(dateSelector);
+            JOptionPane.showMessageDialog(panel, p, "Delete Between Selection", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
+        return panel;
+    }
+    
+    private MaskFormatter createFormatter(String s) {
+        MaskFormatter fm = null;
+        try {
+            fm = new MaskFormatter(s);
+        } catch(java.text.ParseException exc) {
+            System.err.println("Formatter is bad: " + exc.getMessage());
+        }
+        return fm;
+    }
+    
+    private JPanel beforePanel(JComboBox<String> dateSelector) {
+        JPanel panel = new JPanel();
+        JButton deleteButton = new JButton("Delete");
+        JLabel beforeDateLabel = new JLabel("Enter Time: ");
+        //JTextField beforeDateField = new JTextField(15);
+        JLabel selectDayLabel = new JLabel("Select Day ");
+        JFormattedTextField beforeDateField = new JFormattedTextField(createFormatter("##:##:##"));
+        beforeDateField.setColumns(10);
+        beforeDateField.setHorizontalAlignment(JTextField.CENTER);
+        LocalTime lTime = job.getStage(currentStage).getStartTime();
+        beforeDateField.setText(lTime.toString());
+        panel.add(selectDayLabel);
+        panel.add(dateSelector);
+        panel.add(beforeDateLabel);
+        panel.add(beforeDateField);
+        panel.add(deleteButton);
+        
+        deleteButton.addActionListener((event) -> {
+            String stringDate = (String)dateSelector.getSelectedItem();
+            stringDate += " " + beforeDateField.getText();
+            System.out.println(stringDate);
+            try {
+                Date date = formatter.parse(stringDate);
+                Stage stage = job.getStage(currentStage);
+                if(stage.deleteAllRecordingsBefore(date))
+                {
+                    JOptionPane.showConfirmDialog(null, "Successful!", "Deletion", JOptionPane.INFORMATION_MESSAGE);
+                    ChartPanel chartPanel = new ChartPanel(stage.getChart());
+                    setupChartPanel(chartPanel);
+                }
+            } catch (ParseException ex) {
+                JOptionPane.showConfirmDialog(null, "Deletion Unsuccessful");
+            }
+            
+        });
+        
+        return panel;
+    }
+    
+    private JPanel afterPanel(JComboBox<String> dateSelector) {
+        JPanel panel = new JPanel();
+        JButton deleteButton = new JButton("Delete");
+        JLabel afterDateLabel = new JLabel("Enter Time: ");
+        //JTextField afterDateField = new JTextField(15);
+        JFormattedTextField afterDateField = new JFormattedTextField(createFormatter("##:##:##"));
+        afterDateField.setColumns(6);
+        LocalTime lTime = job.getStage(currentStage).getEndTime();
+        afterDateField.setText(lTime.toString());
+        afterDateField.setHorizontalAlignment(JTextField.CENTER);
+        JLabel selectDayLabel = new JLabel("Select Day ");
+        
+        panel.add(selectDayLabel);
+        panel.add(dateSelector);
+        panel.add(afterDateLabel);
+        panel.add(afterDateField);
+        panel.add(deleteButton);
+        
+       
+        
+        deleteButton.addActionListener((event) -> {
+            String stringDate = (String)dateSelector.getSelectedItem();
+            stringDate += " " + afterDateField.getText();
+            System.out.println(stringDate);
+            try {
+                Date date = formatter.parse(stringDate);
+                
+                Stage stage = job.getStage(currentStage);
+                if(stage.deleteAllRecordingsAfter(date))
+                {
+                    int result = JOptionPane.showConfirmDialog(null, "Successful!", "Deletion", JOptionPane.INFORMATION_MESSAGE);
+                    if(result == JOptionPane.OK_OPTION)
+                    {
+                        ChartPanel chartPanel = new ChartPanel(stage.getChart());
+                        setupChartPanel(chartPanel);
+                    }
+                }
+            } catch (ParseException ex) {
+                JOptionPane.showConfirmDialog(null, "Deletion Unsuccessful");
+            }
+        });
+        return panel;
+    }
+    
+    private JPanel betweenPanel(JComboBox<String> dateSelector) {
+        JPanel panel = new JPanel();
+        JButton deleteButton = new JButton("Delete");
+        JLabel beforeDateLabel = new JLabel("Enter Start Time: ");
+        //JTextField beforeDateField = new JTextField(15);
+        JFormattedTextField beforeDateField = new JFormattedTextField(createFormatter("##:##:##"));
+        beforeDateField.setColumns(10);
+        beforeDateField.setHorizontalAlignment(JTextField.CENTER);
+        LocalTime bTime = job.getStage(currentStage).getStartTime();
+        beforeDateField.setText(bTime.toString());
+        JLabel afterDateLabel = new JLabel("Enter End Time: ");
+        //JTextField afterDateField = new JTextField(15);
+        JFormattedTextField afterDateField = new JFormattedTextField(createFormatter("##:##:##"));
+        afterDateField.setColumns(10);
+        afterDateField.setHorizontalAlignment(JTextField.CENTER);
+        LocalTime lTime = job.getStage(currentStage).getEndTime();
+        afterDateField.setText(lTime.toString());
+        JLabel selectDayLabel = new JLabel("Select Day ");
+        
+        panel.add(selectDayLabel);
+        panel.add(dateSelector);
+        panel.add(beforeDateLabel);
+        panel.add(beforeDateField);
+        panel.add(afterDateLabel);
+        panel.add(afterDateField);
+        panel.add(deleteButton);
+        
+        
+        deleteButton.addActionListener((event) -> {
+            String stringDate = (String)dateSelector.getSelectedItem();
+            String startDateStr = stringDate += " " + beforeDateField.getText();
+            String endDateStr = stringDate += " " + afterDateField.getText();
+            System.out.println(startDateStr + " -> " + endDateStr);
+            try {
+                Date startDate = formatter.parse(startDateStr);
+                Date endDate = formatter.parse(endDateStr);
+                
+                Stage stage = job.getStage(currentStage);
+                if(stage.deleteRecordingsBetween(startDate, endDate))
+                {
+                    int result = JOptionPane.showConfirmDialog(null, "Successful!", "Deletion", JOptionPane.OK_CANCEL_OPTION);
+                    if(result == JOptionPane.OK_OPTION)
+                    {
+                        ChartPanel chartPanel = new ChartPanel(stage.getChart());
+                        setupChartPanel(chartPanel);
+                    }
+                }
+            } catch (ParseException ex) {
+                JOptionPane.showConfirmDialog(null, "Deletion Unsuccessful");
+            }
+        });
+        
+        return panel;
+    }
+    
 }
 

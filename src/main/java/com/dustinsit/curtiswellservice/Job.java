@@ -5,6 +5,7 @@
  */
 package com.dustinsit.curtiswellservice;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,6 +44,91 @@ public class Job {
     public String getJobID() {
         return jobID;
     }
+    
+    public String getTotalDuration() {
+        int numSeconds = 0;
+        for(Stage stage : stages.values()) {
+            numSeconds += stage.getDuration().getSeconds();
+        }
+        int days = numSeconds / 86400;
+        int hours = (numSeconds % 86400) / 3600;
+        int minutes = ((numSeconds % 86400) % 3600 ) / 60;
+        int seconds = ((numSeconds % 86400) % 3600 ) % 60;
+        return "Job Duration: " +hours+":"+minutes+":"+seconds;
+    }
+    
+    public double getTotalBarrels() {
+        double totalBarrels = 0.0;
+        for(Stage stage : stages.values())
+        {
+            totalBarrels += stage.getTotalBarrels();
+        }
+        return totalBarrels;
+    }
+    
+    private double getAveragePressure() {
+        double averagePressure = 0.0;
+        for(Stage stage : stages.values())
+        {
+            averagePressure += stage.getAveragePressure();
+        }
+        return averagePressure / stages.size();
+    }
+    
+    private double getAverageWaterRate() {
+        double average = 0.0;
+        for(Stage stage : stages.values())
+        {
+            average += stage.getAverageWaterRate();
+        }
+        return average / stages.size();
+    }
+    
+    private double getAverageSandRate() {
+        double average = 0.0;
+        for(Stage stage : stages.values())
+        {
+            average += stage.getAverageSandRate();
+        }
+        return average / stages.size();
+    }
+    
+    public HashMap<String,Double> getOutliers() {
+        double minPressure = 0.0, maxPressure = 0.0, minWaterRate = 0.0
+                , maxWaterRate = 0.0, minSandRate = 0.0, maxSandRate = 0.0;
+        minPressure = 100.00;
+        minWaterRate = 25.00;
+        minSandRate = 5.00;
+        for(Stage stage : stages.values())
+        {
+            if(stage.getMaxPressure() > maxPressure)
+                maxPressure = stage.getMaxPressure();
+            if(stage.getMinPressure() < minPressure && stage.getMinPressure() > 0)
+                minPressure = stage.getMinPressure();
+            if(stage.getMinWaterRate() < minWaterRate&& stage.getMinWaterRate() > 0)
+                minWaterRate = stage.getMinWaterRate();
+            if(stage.getMaxWaterRate() > maxWaterRate)
+                maxWaterRate = stage.getMaxWaterRate();
+            if(stage.getMinSandRate() < minSandRate && stage.getMinSandRate() > 0)
+                minSandRate = stage.getMinSandRate();
+            if(stage.getMaxSandRate() > maxSandRate)
+                maxSandRate = stage.getMaxSandRate();
+            
+        }
+        HashMap<String,Double> outliers = new HashMap<>();
+        outliers.put("minPressure", minPressure);
+        outliers.put("maxPressure", maxPressure);
+        outliers.put("minWaterRate", minWaterRate);
+        outliers.put("maxWaterRate", maxWaterRate);
+        outliers.put("minSandRate", minSandRate);
+        outliers.put("maxSandRate", maxSandRate);
+        outliers.put("averagePressure", getAveragePressure());
+        outliers.put("averageWaterRate", getAverageWaterRate());
+        outliers.put("averageSandRate", getAverageSandRate());
+        
+        return outliers;
+    }
+    
     public Integer[] getStageNumbers() {
         Integer[] stageNames = new Integer[numStages];
         int i = 0;
@@ -117,6 +203,19 @@ public class Job {
             str += stage;
         }
         return str;
+    }
+    
+    public ArrayList<String> getDates() {
+        ArrayList<String> dates = new ArrayList<>();
+        for(Stage stage : stages.values())
+        {
+            for(String date: stage.dates())
+            {
+                if(!dates.contains(date))
+                    dates.add(date);
+            }
+        }
+        return dates;
     }
     
     
